@@ -1,59 +1,66 @@
 import streamlit as st
 import os
+import fitz  # PyMuPDF for PDF reading
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-import fitz  # PyMuPDF
 
 # Load API Key
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-# Page Config
+# Streamlit UI Setup
 st.set_page_config(page_title="AI Resume Screener", page_icon="📄")
 st.title("📄 AI Resume Screener")
-st.markdown("Upload a resume in PDF format or paste the content below to get a detailed AI-powered screening.")
+st.markdown("Upload a resume PDF and get insights powered by AI.")
 
-# Resume uploader
-uploaded_file = st.file_uploader("📎 Upload PDF Resume", type=["pdf"])
-resume_text_area = st.text_area("📝 Or Paste Resume Text:", height=200)
+# Upload PDF
+uploaded_file = st.file_uploader("📎 Upload Resume (PDF format only)", type=["pdf"])
 
-# Extract text from PDF
-resume_text = ""
-if uploaded_file is not None:
-    with fitz.open(stream=uploaded_file.read(), filetype="pdf") as doc:
-        resume_text = "\n".join(page.get_text() for page in doc)
+# Helper to extract text
+def extract_text_from_pdf(uploaded_pdf):
+    try:
+        doc = fitz.open(stream=uploaded_pdf.read(), filetype="pdf")
+        text = "\n".join([page.get_text() for page in doc])
+        return text
+    except Exception as e:
+        st.error(f"Error reading PDF: {e}")
+        return ""
 
-# Use text area if no file is uploaded
-elif resume_text_area:
-    resume_text = resume_text_area
+# Analyze Resume
+if uploaded_file and st.button("🤖 Analyze Resume"):
+    resume_text = extract_text_from_pdf(uploaded_file)
 
-# Analyze button
-if st.button("🚀 Analyze Resume"):
     if not resume_text.strip():
-        st.warning("Please provide a resume by uploading or pasting text.")
+        st.error("Could not extract any text from the PDF. Please try another file.")
     else:
-        llm = OpenAI(temperature=0.6, max_tokens=1000, model_name="gpt-3.5-turbo-instruct")
+        # Shorten the resume if it's too long
+        if len(resume_text) > 3000:
+            resume_text = resume_text[:3000] + "\n\n[Truncated for token limits]"
 
-        template = """
-You are an AI HR specialist. Analyze the resume below and provide the following:
+        # Setup LLM
+        llm = OpenAI(temperature=0.5, max_tokens=1000)
 
-1. 🔍 **Key Skills Extracted**
-2. 💼 **Professional Experience Summary**
-3. 🎓 **Education Overview**
-4. 🌟 **Strengths & Unique Selling Points**
-5. ⚠️ **Potential Concerns or Gaps**
-6. 📊 **Overall Resume Score (out of 10)** with a short justification
+        # Prompt template
+        prompt_template = PromptTemplate(
+            input_variables=["resume_text"],
+            template="""
+You are an HR specialist. Analyze the following resume and provide:
+
+1. 🏆 Candidate Strengths
+2. ❌ Weaknesses or Concerns
+3. 💡 Suggestions for Improvement
+4. ⭐ Overall Fit Score (0 to 10) with explanation
 
 Resume:
 \"\"\"{resume_text}\"\"\"
 """
-        prompt = PromptTemplate(input_variables=["resume_text"], template=template.strip())
-        chain = LLMChain(llm=llm, prompt=prompt)
+        )
 
-        with st.spinner("Analyzing resume..."):
-            result = chain.run(resume_text)
+        chain = LLMChain(llm=llm, prompt=prompt_template)
 
-        st.success("✅ Resume analyzed successfully!")
-        st.subheader("📑 Resume Analysis Report")
-        st.markdown(result)
+        with st.spinner("Analyzing the resume..."):
+            output = chain.run(resume_text)
 
+        # Display results
+        st.subheader("📋 AI-Powered Resume Analysis")
+        st.markdown(output)
