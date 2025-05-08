@@ -1,3 +1,5 @@
+import pytesseract
+from PIL import Image
 import streamlit as st
 import os
 from langchain.llms import OpenAI
@@ -11,10 +13,10 @@ os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 # Streamlit setup
 st.set_page_config(page_title="AI Resume Screener", page_icon="📄")
 st.title("📄 AI Resume Screener")
-st.markdown("Upload a resume (PDF format) or paste the resume text below to evaluate the candidate's suitability.")
+st.markdown("Upload a resume (PDF format), paste the resume text below, or upload a screenshot to evaluate the candidate's suitability.")
 
-# Option for uploading resume or pasting text
-resume_option = st.radio("Select Resume Input Option", ("Upload Resume PDF", "Paste Resume Text"))
+# Option for uploading resume, pasting text, or uploading screenshot
+resume_option = st.radio("Select Resume Input Option", ("Upload Resume PDF", "Paste Resume Text", "Upload Screenshot"))
 
 # Resume text input if user chooses paste
 resume_text = ""
@@ -25,6 +27,11 @@ if resume_option == "Paste Resume Text":
 uploaded_pdf = None
 if resume_option == "Upload Resume PDF":
     uploaded_pdf = st.file_uploader("Upload Resume PDF", type=["pdf"])
+
+# Screenshot input if user chooses upload screenshot
+uploaded_screenshot = None
+if resume_option == "Upload Screenshot":
+    uploaded_screenshot = st.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg"])
 
 # Function to extract text from PDF
 def extract_text_from_pdf(uploaded_pdf):
@@ -37,16 +44,32 @@ def extract_text_from_pdf(uploaded_pdf):
         st.error(f"Error reading PDF: {e}")
         return ""
 
+# Function to extract text from screenshot using OCR
+def extract_text_from_screenshot(uploaded_screenshot):
+    try:
+        image = Image.open(uploaded_screenshot)
+        text = pytesseract.image_to_string(image)
+        return text
+    except Exception as e:
+        st.error(f"Error reading screenshot: {e}")
+        return ""
+
 # When the user uploads a PDF, extract text from it
 if uploaded_pdf:
     resume_text = extract_text_from_pdf(uploaded_pdf)
     if not resume_text:
         st.error("Could not extract text from the PDF. Please try another file or use the text input option.")
 
+# When the user uploads a screenshot, extract text from it
+if uploaded_screenshot:
+    resume_text = extract_text_from_screenshot(uploaded_screenshot)
+    if not resume_text:
+        st.error("Could not extract text from the screenshot. Please try another image.")
+
 # Resume analysis button
 if st.button("🧠 Analyze Resume"):
     if not resume_text.strip():
-        st.warning("Please provide a resume text either by uploading a PDF or pasting the text.")
+        st.warning("Please provide a resume text either by uploading a PDF, pasting the text, or uploading a screenshot.")
     else:
         # LangChain LLM setup
         llm = OpenAI(temperature=0.7)
@@ -94,4 +117,5 @@ if st.button("🧠 Analyze Resume"):
         st.markdown("---")
         st.subheader("📋 Resume Review Summary")
         st.markdown(result)
+
 
