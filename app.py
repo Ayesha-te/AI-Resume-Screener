@@ -54,7 +54,8 @@ if st.button("🧠 Analyze Resume"):
     if not resume_text.strip():
         st.warning("Please provide or upload resume text first.")
     else:
-        prompt_template = """
+        # Corrected triple-quoted string for prompt
+        prompt_template = f"""
 You are a senior HR manager reviewing the following resume. Provide a detailed review with the following sections:
 
 ### 🔍 Issues Found:
@@ -74,5 +75,3 @@ You are a senior HR manager reviewing the following resume. Provide a detailed r
 - Keep the order as defined.
 
 Resume to analyze:
-```text
-{resume_text}
