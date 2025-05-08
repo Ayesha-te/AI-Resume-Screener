@@ -2,4 +2,4 @@ openai
 langchain
 streamlit
 langchain-community
-PyMuPDF
+PyMuPDF==1.23.7
