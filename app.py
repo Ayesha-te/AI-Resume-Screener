@@ -1,66 +1,97 @@
 import streamlit as st
 import os
-import fitz  # PyMuPDF for PDF reading
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+import fitz  # PyMuPDF for PDF extraction
 
-# Load API Key
+# Load OpenAI API key from Streamlit secrets
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-# Streamlit UI Setup
+# Streamlit setup
 st.set_page_config(page_title="AI Resume Screener", page_icon="📄")
 st.title("📄 AI Resume Screener")
-st.markdown("Upload a resume PDF and get insights powered by AI.")
+st.markdown("Upload a resume (PDF format) or paste the resume text below to evaluate the candidate's suitability.")
 
-# Upload PDF
-uploaded_file = st.file_uploader("📎 Upload Resume (PDF format only)", type=["pdf"])
+# Option for uploading resume or pasting text
+resume_option = st.radio("Select Resume Input Option", ("Upload Resume PDF", "Paste Resume Text"))
 
-# Helper to extract text
+# Resume text input if user chooses paste
+resume_text = ""
+if resume_option == "Paste Resume Text":
+    resume_text = st.text_area("Paste Resume Text Here", height=300)
+
+# Resume PDF input if user chooses upload
+uploaded_pdf = None
+if resume_option == "Upload Resume PDF":
+    uploaded_pdf = st.file_uploader("Upload Resume PDF", type=["pdf"])
+
+# Function to extract text from PDF
 def extract_text_from_pdf(uploaded_pdf):
     try:
+        uploaded_pdf.seek(0)  # Ensure we read from the start of the file
         doc = fitz.open(stream=uploaded_pdf.read(), filetype="pdf")
-        text = "\n".join([page.get_text() for page in doc])
+        text = "\n".join([page.get_text("text") for page in doc])
         return text
     except Exception as e:
         st.error(f"Error reading PDF: {e}")
         return ""
 
-# Analyze Resume
-if uploaded_file and st.button("🤖 Analyze Resume"):
-    resume_text = extract_text_from_pdf(uploaded_file)
+# When the user uploads a PDF, extract text from it
+if uploaded_pdf:
+    resume_text = extract_text_from_pdf(uploaded_pdf)
+    if not resume_text:
+        st.error("Could not extract text from the PDF. Please try another file or use the text input option.")
 
+# Resume analysis button
+if st.button("🧠 Analyze Resume"):
     if not resume_text.strip():
-        st.error("Could not extract any text from the PDF. Please try another file.")
+        st.warning("Please provide a resume text either by uploading a PDF or pasting the text.")
     else:
-        # Shorten the resume if it's too long
-        if len(resume_text) > 3000:
-            resume_text = resume_text[:3000] + "\n\n[Truncated for token limits]"
+        # LangChain LLM setup
+        llm = OpenAI(temperature=0.7)
 
-        # Setup LLM
-        llm = OpenAI(temperature=0.5, max_tokens=1000)
-
-        # Prompt template
-        prompt_template = PromptTemplate(
-            input_variables=["resume_text"],
-            template="""
-You are an HR specialist. Analyze the following resume and provide:
-
-1. 🏆 Candidate Strengths
-2. ❌ Weaknesses or Concerns
-3. 💡 Suggestions for Improvement
-4. ⭐ Overall Fit Score (0 to 10) with explanation
-
-Resume:
-\"\"\"{resume_text}\"\"\"
-"""
+        # Prompt template for resume analysis
+        prompt_text = (
+            "You are a senior HR manager reviewing the following resume. "
+            "Please provide a detailed review with the following sections in **exact order**, "
+            "including explanations, suggestions, and a quality score. Do not skip any sections.\n\n"
+            
+            "### 🔍 Issues Found:\n"
+            "1. Identify all weaknesses or areas where the candidate's qualifications may not align with the role.\n\n"
+            
+            "### ✅ Suggestions for Improvement:\n"
+            "2. Provide suggestions for how the candidate could improve their resume.\n\n"
+            
+            "### 📘 Explanations:\n"
+            "3. Provide detailed explanations for each weakness and suggestion, and how the candidate could improve.\n\n"
+            
+            "### 🧠 Candidate Suitability Score (out of 10):\n"
+            "4. Based on the resume, provide a suitability score for the role and explain why the score is justified.\n\n"
+            
+            "### Important Instructions:\n"
+            "- Do **not** skip any of these sections. All sections are mandatory.\n"
+            "- Follow the **exact** order of sections as specified.\n\n"
+            
+            "Resume to analyze:\n"
+            "```text\n{resume_text}\n```"
         )
 
-        chain = LLMChain(llm=llm, prompt=prompt_template)
+        # Create prompt template with resume text input
+        prompt = PromptTemplate(
+            input_variables=["resume_text"],
+            template=prompt_text
+        )
+
+        # Create the LLM chain
+        chain = LLMChain(llm=llm, prompt=prompt)
 
         with st.spinner("Analyzing the resume..."):
-            output = chain.run(resume_text)
+            # Run the chain to generate the response
+            result = chain.run(resume_text)
 
-        # Display results
-        st.subheader("📋 AI-Powered Resume Analysis")
-        st.markdown(output)
+        # Display the formatted review
+        st.markdown("---")
+        st.subheader("📋 Resume Review Summary")
+        st.markdown(result)
+
