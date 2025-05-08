@@ -3,27 +3,37 @@ import os
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+import fitz  # PyMuPDF
 
-# Load API key from .streamlit/secrets.toml
+# Load API Key
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-# Page settings
+# Page Config
 st.set_page_config(page_title="AI Resume Screener", page_icon="📄")
 st.title("📄 AI Resume Screener")
-st.markdown("Upload or paste a resume to get a detailed AI-powered screening and ranking.")
+st.markdown("Upload a resume in PDF format or paste the content below to get a detailed AI-powered screening.")
 
-# Resume input
-resume_text = st.text_area("📋 Paste Resume Text Here:", height=300, placeholder="Paste candidate's resume...")
+# Resume uploader
+uploaded_file = st.file_uploader("📎 Upload PDF Resume", type=["pdf"])
+resume_text_area = st.text_area("📝 Or Paste Resume Text:", height=200)
 
-# Button
+# Extract text from PDF
+resume_text = ""
+if uploaded_file is not None:
+    with fitz.open(stream=uploaded_file.read(), filetype="pdf") as doc:
+        resume_text = "\n".join(page.get_text() for page in doc)
+
+# Use text area if no file is uploaded
+elif resume_text_area:
+    resume_text = resume_text_area
+
+# Analyze button
 if st.button("🚀 Analyze Resume"):
     if not resume_text.strip():
-        st.warning("Please paste a resume before clicking.")
+        st.warning("Please provide a resume by uploading or pasting text.")
     else:
-        # LLM
         llm = OpenAI(temperature=0.6, max_tokens=1000, model_name="gpt-3.5-turbo-instruct")
 
-        # Prompt Template
         template = """
 You are an AI HR specialist. Analyze the resume below and provide the following:
 
@@ -37,11 +47,7 @@ You are an AI HR specialist. Analyze the resume below and provide the following:
 Resume:
 \"\"\"{resume_text}\"\"\"
 """
-        prompt = PromptTemplate(
-            input_variables=["resume_text"],
-            template=template.strip()
-        )
-
+        prompt = PromptTemplate(input_variables=["resume_text"], template=template.strip())
         chain = LLMChain(llm=llm, prompt=prompt)
 
         with st.spinner("Analyzing resume..."):
@@ -50,3 +56,4 @@ Resume:
         st.success("✅ Resume analyzed successfully!")
         st.subheader("📑 Resume Analysis Report")
         st.markdown(result)
+
