@@ -7,18 +7,19 @@ from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
-# Optional: set tesseract path if not in PATH (Windows)
+# Optional: If using Windows and Tesseract is not in PATH
+# Uncomment the line below and set the correct path:
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-# Set API key from Streamlit secrets
+# Load OpenAI API key from Streamlit secrets
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-# Streamlit page setup
+# Streamlit UI setup
 st.set_page_config(page_title="AI Resume Screener", page_icon="📄")
 st.title("📄 AI Resume Screener")
-st.markdown("Upload a resume (PDF, screenshot), or paste resume text below to analyze candidate fit.")
+st.markdown("Upload a resume (PDF or Screenshot), or paste resume text below to analyze the candidate.")
 
-# Resume input options
+# Input options
 option = st.radio("Choose Input Type:", ["Upload PDF", "Paste Text", "Upload Screenshot"])
 
 resume_text = ""
@@ -26,36 +27,35 @@ resume_text = ""
 # Upload PDF
 if option == "Upload PDF":
     uploaded_pdf = st.file_uploader("Upload Resume PDF", type=["pdf"])
-    if uploaded_pdf is not None:
+    if uploaded_pdf:
         try:
             uploaded_pdf.seek(0)
             doc = fitz.open(stream=uploaded_pdf.read(), filetype="pdf")
             resume_text = "\n".join([page.get_text() for page in doc])
         except Exception as e:
-            st.error(f"PDF processing error: {e}")
+            st.error(f"Error reading PDF: {e}")
 
-# Paste text
+# Paste Text
 elif option == "Paste Text":
     resume_text = st.text_area("Paste your resume text below:", height=300)
 
 # Upload Screenshot
 elif option == "Upload Screenshot":
     uploaded_img = st.file_uploader("Upload Screenshot (JPG/PNG)", type=["jpg", "jpeg", "png"])
-    if uploaded_img is not None:
+    if uploaded_img:
         try:
             image = Image.open(uploaded_img)
             resume_text = pytesseract.image_to_string(image)
         except Exception as e:
-            st.error(f"OCR error: {e}")
+            st.error(f"OCR Error: {e}")
 
-# Analyze Button
+# Analyze Resume
 if st.button("🧠 Analyze Resume"):
     if not resume_text.strip():
-        st.warning("Please provide or upload resume text.")
+        st.warning("Please provide or upload resume text first.")
     else:
-        # Define prompt template
         prompt_template = """
-You are a senior HR manager reviewing the following resume. Provide a detailed review with the following sections in exact order.
+You are a senior HR manager reviewing the following resume. Provide a detailed review with the following sections:
 
 ### 🔍 Issues Found:
 1. List weaknesses or misalignments with a typical job role.
