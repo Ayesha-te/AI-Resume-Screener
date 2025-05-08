@@ -1,121 +1,81 @@
+import os
+import streamlit as st
 import pytesseract
 from PIL import Image
-import streamlit as st
-import os
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 import fitz  # PyMuPDF for PDF extraction
 
-# Load OpenAI API key from Streamlit secrets
+# 🧠 Set Tesseract path (Windows only)
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+# 🔐 Load OpenAI API key from Streamlit secrets
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-# Streamlit setup
+# 🚀 Streamlit setup
 st.set_page_config(page_title="AI Resume Screener", page_icon="📄")
 st.title("📄 AI Resume Screener")
-st.markdown("Upload a resume (PDF format), paste the resume text below, or upload a screenshot to evaluate the candidate's suitability.")
+st.markdown("Upload a resume (PDF, image) or paste text to evaluate the candidate's suitability.")
 
-# Option for uploading resume, pasting text, or uploading screenshot
-resume_option = st.radio("Select Resume Input Option", ("Upload Resume PDF", "Paste Resume Text", "Upload Screenshot"))
+# 🎯 Input options
+option = st.radio("Choose resume input method:", ["Upload Resume PDF", "Paste Resume Text", "Upload Screenshot"])
 
-# Resume text input if user chooses paste
 resume_text = ""
-if resume_option == "Paste Resume Text":
-    resume_text = st.text_area("Paste Resume Text Here", height=300)
 
-# Resume PDF input if user chooses upload
-uploaded_pdf = None
-if resume_option == "Upload Resume PDF":
-    uploaded_pdf = st.file_uploader("Upload Resume PDF", type=["pdf"])
+# 📄 PDF Upload
+if option == "Upload Resume PDF":
+    uploaded_pdf = st.file_uploader("Upload a PDF resume", type=["pdf"])
+    if uploaded_pdf:
+        try:
+            uploaded_pdf.seek(0)
+            doc = fitz.open(stream=uploaded_pdf.read(), filetype="pdf")
+            resume_text = "\n".join([page.get_text("text") for page in doc])
+        except Exception as e:
+            st.error(f"Failed to extract PDF text: {e}")
 
-# Screenshot input if user chooses upload screenshot
-uploaded_screenshot = None
-if resume_option == "Upload Screenshot":
-    uploaded_screenshot = st.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg"])
+# ✏️ Text Paste
+elif option == "Paste Resume Text":
+    resume_text = st.text_area("Paste resume text here:", height=300)
 
-# Function to extract text from PDF
-def extract_text_from_pdf(uploaded_pdf):
-    try:
-        uploaded_pdf.seek(0)  # Ensure we read from the start of the file
-        doc = fitz.open(stream=uploaded_pdf.read(), filetype="pdf")
-        text = "\n".join([page.get_text("text") for page in doc])
-        return text
-    except Exception as e:
-        st.error(f"Error reading PDF: {e}")
-        return ""
+# 🖼️ Image Upload
+elif option == "Upload Screenshot":
+    uploaded_img = st.file_uploader("Upload a resume screenshot (jpg/png)", type=["jpg", "jpeg", "png"])
+    if uploaded_img:
+        try:
+            image = Image.open(uploaded_img).convert("RGB")
+            resume_text = pytesseract.image_to_string(image)
+        except Exception as e:
+            st.error(f"Failed to extract image text: {e}")
 
-# Function to extract text from screenshot using OCR
-def extract_text_from_screenshot(uploaded_screenshot):
-    try:
-        image = Image.open(uploaded_screenshot)
-        text = pytesseract.image_to_string(image)
-        return text
-    except Exception as e:
-        st.error(f"Error reading screenshot: {e}")
-        return ""
-
-# When the user uploads a PDF, extract text from it
-if uploaded_pdf:
-    resume_text = extract_text_from_pdf(uploaded_pdf)
-    if not resume_text:
-        st.error("Could not extract text from the PDF. Please try another file or use the text input option.")
-
-# When the user uploads a screenshot, extract text from it
-if uploaded_screenshot:
-    resume_text = extract_text_from_screenshot(uploaded_screenshot)
-    if not resume_text:
-        st.error("Could not extract text from the screenshot. Please try another image.")
-
-# Resume analysis button
+# 🚀 Analyze Button
 if st.button("🧠 Analyze Resume"):
     if not resume_text.strip():
-        st.warning("Please provide a resume text either by uploading a PDF, pasting the text, or uploading a screenshot.")
+        st.warning("Please upload or paste resume content first.")
     else:
-        # LangChain LLM setup
+        # 🔧 Set up LangChain with OpenAI
         llm = OpenAI(temperature=0.7)
 
-        # Prompt template for resume analysis
-        prompt_text = (
-            "You are a senior HR manager reviewing the following resume. "
-            "Please provide a detailed review with the following sections in **exact order**, "
-            "including explanations, suggestions, and a quality score. Do not skip any sections.\n\n"
-            
-            "### 🔍 Issues Found:\n"
-            "1. Identify all weaknesses or areas where the candidate's qualifications may not align with the role.\n\n"
-            
-            "### ✅ Suggestions for Improvement:\n"
-            "2. Provide suggestions for how the candidate could improve their resume.\n\n"
-            
-            "### 📘 Explanations:\n"
-            "3. Provide detailed explanations for each weakness and suggestion, and how the candidate could improve.\n\n"
-            
-            "### 🧠 Candidate Suitability Score (out of 10):\n"
-            "4. Based on the resume, provide a suitability score for the role and explain why the score is justified.\n\n"
-            
-            "### Important Instructions:\n"
-            "- Do **not** skip any of these sections. All sections are mandatory.\n"
-            "- Follow the **exact** order of sections as specified.\n\n"
-            
-            "Resume to analyze:\n"
-            "```text\n{resume_text}\n```"
-        )
+        prompt_template = """
+You are a senior HR manager reviewing the following resume. Provide a detailed review with the following sections in exact order.
 
-        # Create prompt template with resume text input
-        prompt = PromptTemplate(
-            input_variables=["resume_text"],
-            template=prompt_text
-        )
+### 🔍 Issues Found:
+1. List weaknesses or misalignments with a typical job role.
 
-        # Create the LLM chain
-        chain = LLMChain(llm=llm, prompt=prompt)
+### ✅ Suggestions for Improvement:
+2. Suggest how the resume could be improved.
 
-        with st.spinner("Analyzing the resume..."):
-            # Run the chain to generate the response
-            result = chain.run(resume_text)
+### 📘 Explanations:
+3. Explain each weakness and suggestion in detail.
 
-        # Display the formatted review
-        st.markdown("---")
-        st.subheader("📋 Resume Review Summary")
-        st.markdown(result)
+### 🧠 Candidate Suitability Score (out of 10):
+4. Score the candidate and justify the score.
 
+### Important:
+- All sections are mandatory.
+- Keep the order as defined.
+
+Resume to analyze:
+```text
+{resume_text}
 
