@@ -8,7 +8,6 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
 # Optional: If using Windows and Tesseract is not in PATH
-# Uncomment the line below and set the correct path:
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # Load OpenAI API key from Streamlit secrets
@@ -46,6 +45,7 @@ elif option == "Upload Screenshot":
         try:
             image = Image.open(uploaded_img)
             resume_text = pytesseract.image_to_string(image)
+            resume_text = resume_text.replace('\n', ' ').strip()
         except Exception as e:
             st.error(f"OCR Error: {e}")
 
@@ -54,8 +54,8 @@ if st.button("🧠 Analyze Resume"):
     if not resume_text.strip():
         st.warning("Please provide or upload resume text first.")
     else:
-        # Corrected triple-quoted string for prompt
-        prompt_template = f"""
+        # Prompt Template
+        prompt_template = """
 You are a senior HR manager reviewing the following resume. Provide a detailed review with the following sections:
 
 ### 🔍 Issues Found:
@@ -74,4 +74,23 @@ You are a senior HR manager reviewing the following resume. Provide a detailed r
 - All sections are mandatory.
 - Keep the order as defined.
 
-Resume to analyze:
+Resume:
+{resume}
+"""
+
+        # LangChain setup
+        prompt = PromptTemplate(
+            input_variables=["resume"],
+            template=prompt_template,
+        )
+        llm = OpenAI(temperature=0.7)
+        chain = LLMChain(llm=llm, prompt=prompt)
+
+        # Run LLM chain
+        with st.spinner("Analyzing resume..."):
+            response = chain.run(resume=resume_text)
+
+        # Display result
+        st.markdown("### 📊 AI Resume Review")
+        st.markdown(response)
+
