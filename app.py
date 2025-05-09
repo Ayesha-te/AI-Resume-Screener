@@ -44,12 +44,12 @@ Resume:
 {resume}
 """
 
-        # LangChain setup
+        # LangChain setup with token management
         prompt = PromptTemplate(
             input_variables=["resume"],
             template=prompt_template,
         )
-        llm = OpenAI(temperature=0.7)
+        llm = OpenAI(temperature=0.7, max_tokens=1500)  # <-- increased token limit
         chain = LLMChain(llm=llm, prompt=prompt)
 
         # Run LLM chain
