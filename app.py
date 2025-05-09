@@ -10,17 +10,18 @@ os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 # Streamlit UI setup
 st.set_page_config(page_title="AI Resume Screener", page_icon="📄")
 st.title("📄 AI Resume Screener")
-st.markdown("Paste resume text below to analyze the candidate.")
+st.markdown("Paste your resume text below to receive an AI-powered review and improvement suggestions.")
 
-# Input: Paste Text only
-resume_text = st.text_area("Paste your resume text below:", height=300)
+# Input section
+resume_text = st.text_area("📄 Paste Resume Text", height=300, placeholder="Paste your resume content here...")
 
-# Analyze Resume
+# Analyze Resume Button
 if st.button("🧠 Analyze Resume"):
     if not resume_text.strip():
-        st.warning("Please provide resume text first.")
+        st.warning("⚠️ Please paste your resume text before analyzing.")
     else:
-      prompt_template = """
+        # Prompt Template
+        prompt_template = """
 You are a senior HR manager tasked with reviewing resumes for a variety of roles. The goal is to evaluate the resume for overall quality, clarity, professionalism, and relevance to typical job expectations in the applicant's field.
 
 Provide a detailed review of the following resume with the following sections:
@@ -35,7 +36,7 @@ Provide a detailed review of the following resume with the following sections:
 3. Explain each weakness and suggestion in detail so the candidate understands how to improve.
 
 ### 🧠 Candidate Suitability Score (out of 10):
-4. Score the candidate based on overall resume quality and clarity — **do not assume they are applying for any specific job role** unless it is explicitly mentioned.
+4. Score the candidate based on overall resume quality and clarity — do not assume they are applying for any specific job role unless it is explicitly mentioned.
 
 ### Important:
 - All sections are mandatory.
@@ -45,17 +46,15 @@ Resume:
 {resume}
 """
 
-
-        # LangChain setup with token management
+        # LangChain setup
         prompt = PromptTemplate(
             input_variables=["resume"],
             template=prompt_template,
         )
-        llm = OpenAI(temperature=0.7, max_tokens=1500)  # <-- increased token limit
+        llm = OpenAI(temperature=0.7, max_tokens=1500)  # Increased token limit for longer output
         chain = LLMChain(llm=llm, prompt=prompt)
 
-        # Run LLM chain
-        with st.spinner("Analyzing resume..."):
+        with st.spinner("Analyzing your resume..."):
             response = chain.run(resume=resume_text)
 
         # Display result
