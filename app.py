@@ -20,29 +20,31 @@ if st.button("🧠 Analyze Resume"):
     if not resume_text.strip():
         st.warning("Please provide resume text first.")
     else:
-        # Prompt Template
-        prompt_template = """
-You are a senior HR manager reviewing the following resume. Provide a detailed review with the following sections:
+      prompt_template = """
+You are a senior HR manager tasked with reviewing resumes for a variety of roles. The goal is to evaluate the resume for overall quality, clarity, professionalism, and relevance to typical job expectations in the applicant's field.
+
+Provide a detailed review of the following resume with the following sections:
 
 ### 🔍 Issues Found:
-1. List weaknesses or misalignments with a typical job role.
+1. List weaknesses or inconsistencies found in the resume.
 
 ### ✅ Suggestions for Improvement:
-2. Suggest how the resume could be improved.
+2. Suggest how the resume could be improved to enhance clarity, relevance, and professionalism.
 
 ### 📘 Explanations:
-3. Explain each weakness and suggestion in detail.
+3. Explain each weakness and suggestion in detail so the candidate understands how to improve.
 
 ### 🧠 Candidate Suitability Score (out of 10):
-4. Score the candidate and justify the score.
+4. Score the candidate based on overall resume quality and clarity — **do not assume they are applying for any specific job role** unless it is explicitly mentioned.
 
 ### Important:
 - All sections are mandatory.
-- Keep the order as defined.
+- Evaluate the resume based on general professional standards, not a specific job title.
 
 Resume:
 {resume}
 """
+
 
         # LangChain setup with token management
         prompt = PromptTemplate(
