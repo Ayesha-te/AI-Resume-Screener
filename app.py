@@ -31,6 +31,8 @@ if option == "Upload PDF":
             uploaded_pdf.seek(0)
             doc = fitz.open(stream=uploaded_pdf.read(), filetype="pdf")
             resume_text = "\n".join([page.get_text() for page in doc])
+            st.success("PDF parsed successfully!")
+            st.text_area("Extracted Resume Text:", resume_text, height=300)  # Show extracted text for debugging
         except Exception as e:
             st.error(f"Error reading PDF: {e}")
 
@@ -93,4 +95,3 @@ Resume:
         # Display result
         st.markdown("### 📊 AI Resume Review")
         st.markdown(response)
-
